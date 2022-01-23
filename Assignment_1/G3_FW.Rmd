@@ -1,0 +1,424 @@
+---
+title: "Análisis Exploratorio Censo Población Penitenciaria"
+author: "GRUPO 3: Daniel Soto, Gissela Cornejo, José de la Cruz"
+date: "22/1/2022"
+output: 
+  html_document:
+    collapsed: FALSE
+    theme: cosmo
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+
+## Introducción
+
+### a) Suba la base de datos a utilizar a un repositorio de GitHub, cárguela y presente una breve descripción.
+
+https://github.com/gisselacornejocastellano/censo_nacional_penitenciario_2016
+
+Base de datos reducida:
+
+https://github.com/DanielSotoHurtado/Censo_Nacional_Penitenciario/raw/main/_data/pob_pen_sel.sav
+
+El [Primer Censo Nacional Penitenciario](https://www.inei.gob.pe/media/MenuRecursivo/publicaciones_digitales/Est/Lib1364/index.html) fue ejecutado entre el 18 y 24 de abril del 2016 por Instituto Nacional de Estadística e Informática (INEI) en coordinación con el Ministerio de Justicia. El objetivo fue obtener información estadística sobre las características sociodemográficas y situación jurídica de la población penitenciaria de 18 años y más de edad recluida en los 66 establecimientos penitenciarios del país.
+
+
+###  b) Planteamiento del problema y pregunta de investigación, objetivo principal y objetivos secundarios.
+
+- Planteamiento del problema:
+
+De acuerdo con la encuesta nacional de El Comercio-Ipsos de noviembre de 2019, el 79% de peruanos sentía que el país era más inseguro que en el año anterior. Esta misma encuestadora reveló en enero del 2020 que el crimen y la violencia son el tercer tema más preocupante para los peruanos, luego de la Covid-19 y la corrupción financiera/ política. El Estado peruano atiende el problema de la inseguridad, violencia y delincuencia principalmente desde una lógica represiva, dejando de lado la prevención del delito y guiándose por la corriente de opinión que exige mayor represión debido a una sensación del incremento de la inseguridad. En pocas palabras, la gestión tiende a ser más reactiva que preventiva. ¿Qué factores caracterizan a la población penitenciaria en el Perú? ¿Existen condicionantes o determinantes en sus historias de vida? ¿Existe correlación entre estos y los tipos de delitos por los que están en situación de cárcel? 
+
+Este trabajo analizará los datos recogidos en el Censo Nacional Penitenciario 2016 para identificar las características personales, familiares y sociales de la población penal y realizar un análisis de los componentes principales (PCA). Esto permitirá estudiar la correlación entre el perfil de las personas recluidas y la comisión de algún tipo de delitos. De esta manera, el Estado podría intervenir de manera preventiva y mejor focalizada. Se trata de amplificar la estrategia de reducción de la delincuencia puesto que “[La represión es una dimensión de la seguridad ciudadana, al igual que la prevención, la rehabilitación y la reinserción.](https://nuso.org/articulo/el-problema-de-la-inseguridad-y-el-castigo-desde-una-vision-alternativa/)” (Calix, 2007, p. 43). 
+
+- Pregunta: ¿Existe relación entre las condiciones familiares y sociales de los(as) internos y los tipo de delitos?
+
+- Objetivo principal: Explorar si existe una correlación entre las condiciones personales, familiares y sociales de los(as) internos(as) y el tipo de delito por el que se encuentran en situación de cárcel.
+
+- Objetivos secundarios:
+
+Identificar y describir las variables más recurrentes que caracterizan a la población penitenciaria. 
+Construir un indicador que sintetice las condiciones familiares y sociales según el análisis de componentes principales.
+
+
+### c) Análisis exploratorio de las principales variables que se utilizarán para la app.
+
+
+
+
+### Instalación de paquetes necesarios
+
+```{r library}
+# For importing data an data cleaning
+library(haven)
+library(rio)
+library(tidyverse)
+# For manipulating labels
+library(sjPlot)
+library(sjlabelled)
+```
+
+
+### Cargando la data
+
+```{r importing data}
+
+#pob_pen_raw_0 <- read_sav("https://github.com/gisselacornejocastellano/censo_nacional_penitenciario_2016/raw/main/512-Modulo860/01_PENALES_CARATULA.sav", encoding = "UTF-8", user_na = TRUE)
+#pob_pen_raw_1 <- read_sav("https://github.com/gisselacornejocastellano/censo_nacional_penitenciario_2016/raw/main/512-Modulo861/01_PENALES_CAP100.sav", encoding = "UTF-8", user_na = TRUE)
+#pob_pen_raw_2 <- read_sav("https://github.com/gisselacornejocastellano/censo_nacional_penitenciario_2016/raw/main/512-Modulo862/01_PENALES_CAP200.sav", encoding = "UTF-8", user_na = TRUE)
+#glimpse(pob_pen_raw)
+
+```
+
+```{r joining data}
+pob_pen_raw <- read_sav("https://github.com/DanielSotoHurtado/Censo_Nacional_Penitenciario/raw/main/_data/pob_pen_sel.sav", encoding = "UTF-8", user_na = TRUE)
+
+
+#pob_pen_raw <- pob_pen_raw_0 |> 
+  #inner_join(pob_pen_raw_1, by = 'ID_CARATULA') |> 
+  #inner_join(pob_pen_raw_2, by = 'ID_CARATULA')
+#rm(pob_pen_raw_0, pob_pen_raw_1, pob_pen_raw_2)
+
+```
+
+* Seleccionamos las variables con las que trabajaremos
+
+```{r}
+selected_var_2 <- c('ID_CARATULA', 'DD', 'EST_PENIT', 'GENERO', 'RELIGION', 'EDAD', 'NACIONALIDAD', 'DELITO_GENERICO',
+                    'DELITO_ESPECIFICO', 'P101', 'P104_1', 'P120',
+                    'P119_1', 'P119_2', 'P119_3', 'P119_4', 'P119_5', 'P119_6',
+                    'P109_1', 'P109A_1', 'P109B_1',
+                    'P109C_1', 'P109D_1','P109_2', 'P109A_2', 'P109B_2', 'P109D_2', 'P114', 
+                    'P117',
+                    'P122', 'P124', 'P124_NO', 'P126', 'P127', 'P128', 'P129',
+                    'P130', 'P131', 'P132', 'P133', 'P135', 'P136',
+                    'P215', 'P216'
+                    )
+selected_var_1 <- c('P101', 'P104_1', 'P112', 'P126', 'P136')
+selected_var_3 <- c('P202', 'P203', 'P204', 'P205', 'P206', 'P208', 'P209', 'P210', 
+                    'P211', 'P212', 'P213', 'P215', 'P220' )
+```
+
+* Creamos la base `pob_pen_sel`
+
+```{r select variables}
+pob_pen_sel <- pob_pen_raw |>
+  select(selected_var_2)
+```
+
+
+```{r}
+#sjPlot::view_df(pob_pen_raw_2)
+#sjPlot::view_df(pob_pen_sel)
+
+```
+
+
+### Características de la base de datos
+
+
+* Exploramos los tipos de variables:
+
+```{r}
+glimpse(pob_pen_sel)
+```
+
+Nuestras variables no cuentan aún con un **formato adecuado**. Además, contienen objetos de etiqueta <dbl+lbl> tanto para el nombre como para los valores de la variable.
+
+* Exploramos si nuestra base de datos cuenta con **valores perdidos**
+
+```{r, missing values}
+pob_pen_sel |> 
+  summarise(across(.cols = selected_var_2,
+                   .fns = ~ sum(is.na(.x)),
+                   .names = "NA_{col}")) |> 
+  glimpse()
+
+```
+
+Como podemos ver parte de nuestras variables contienen valores perdidos. En algunos casos esto reside en la naturaleza de la pregunta. 
+
+
+* Presentamos la información contenida en las **etiquetas** de las variables
+
+```{r echo=FALSE}
+pob_pen_sel |> 
+  summarise(across(.cols = selected_var_2,
+                   .fns = ~ get_label(.x))) |> 
+  pivot_longer(cols= everything(), 
+               names_to = "variables", 
+               values_to = "etiquetas_variables")
+# puede resultar más rápido utilizar la función sjPlot::view_df(ide) del paquete sjPlot
+```
+
+
+
+### Limpieza de la base de datos
+
++ En primer lugar, reemplazamos los valores de la variable con las etiquetas de los mismos para nuestras `selected_var`. Guardaos el resultado en el objeto `sel_clean`
+
+```{r}
+sel_clean <- pob_pen_sel  |> 
+  # Cambiamos los valores para todas las variables seleccionadas a partir de sus etiquetas
+  mutate(across(.cols = selected_var_2,
+                .fns = ~ as_label(.x))) |> 
+  # Limpiamos los valores 
+  mutate(across(.cols = selected_var_2,
+                .fns = ~ str_replace_all(.x, "\\?", "" )))
+head(sel_clean)
+
+```
+
+
+## Análisis Exploratorio
+
+### Análisis descriptivo principales variables
+
+* Realizamos una análisis exploratorio de la variable P101: `r get_label(sel_clean$P101)`
+
+
+  + En primer lugar, pedimos una tabla de las respuestas a esta pregunta
+  
+```{r}
+t_p101<- sel_clean |> 
+  count(P101, sort = TRUE) |> 
+  mutate(pct = round((n/sum(n))*100, digits = 2))
+t_p101
+ 
+```
+
+  + Luego, representamos los resultados en un gráfico de barras
+  
+```{r}
+t_p101 |> 
+  ggplot(aes(x= fct_reorder(P101, pct), y = pct, fill = P101)) +
+  geom_col() +
+  coord_flip()
+# fct_recode
+```
+
+
+### Escribiendo una función para las variables seleccionadas
+
+Podemos replicar los mismos pasos aplicados a la pregunta `P101` mediante una [función](https://medium.com/optima-blog/writing-your-own-dplyr-functions-a1568720db0d)
+
+```{r}
+eda <- function(data, group_col){
+  
+  data |> 
+    group_by_(.dots = lazyeval::lazy(group_col)) |> summarize(count = n()) |> 
+    mutate(percent = round((count / sum(count)) * 100, digits = 2)) |> 
+    arrange(desc(count)) |> 
+    drop_na()
+  
+}
+
+```
+
+
+                    
+* Podemos hacer un loop sobre todas nuestras variables con la función `eda` creada para el análisis exploratorio
+
+```{r}
+output = list()
+for(i in 1:length(names(sel_clean))){
+  output[[i]] <- sel_clean |> 
+    eda(sel_clean[i])
+}
+```
+
+Los resultados están guardados en el `objeto` output. Podemos imprimirlos a través de otro for loop
+
+```{r}
+#for (j in 1:length(output)){
+#  print(output[[j]])
+#}
+```
+
+
+### Características personales
+
+* Aquí presentamos algunas tablas que resumen las variables de interés
+
+  + Lengua materna
+
+```{r}
+sel_clean |> 
+  eda(P101)
+```
+
+  + Nivel de estudios
+
+```{r}
+sel_clean |> 
+  eda(P104_1)
+```
+
+  + Género
+
+
+```{r}
+sel_clean |> 
+  eda(GENERO)
+```
+
+  + Nacionalidad
+
+```{r}
+sel_clean |> 
+  eda(NACIONALIDAD)
+```
+  
+  + Religión
+
+```{r}
+sel_clean |> 
+  eda(RELIGION)
+```
+
+  + Autoidentificación
+
+```{r}
+sel_clean |> 
+  eda(P120)
+```
+
+
+### Características familiares y sociales
+
+ * Pertenencia a Fuerzas Armadas, Policía, Serenazgo, CAs
+
+```{r}
+#output[[13]]
+
+sel_clean |> 
+  eda(P119_1)
+sel_clean |> 
+  eda(P119_2)
+sel_clean |> 
+  eda(P119_3)
+sel_clean |> 
+  eda(P119_4)
+sel_clean |> 
+  eda(P119_5)
+sel_clean |> 
+  eda(P119_6)
+
+
+
+#output[[18]]
+```
+
+* Consumo de drogas, alcohol
+
+```{r}
+#output[[19]]
+# consumió drogas antes de ingresar al CP
+sel_clean |> 
+  eda(P109_1)
+# cuales
+sel_clean |> 
+  eda(P109A_1)
+#sel_clean |> 
+  #eda(P109A_2)
+sel_clean |> 
+  eda(P109C_1)
+sel_clean |> 
+  eda(P109D_1)
+# consumío drogas antes de ingresar al CP
+sel_clean |> 
+  eda(P109_2)
+#sel_clean |> 
+  #eda(P109_A2)
+# Edad 
+sel_clean |> 
+  eda(P109B_2)
+# Frecuencia
+sel_clean |> 
+  eda(P109D_2)
+sel_clean |> 
+  eda(P109C_1)
+
+#output[[24]]
+
+
+```
+
+* Ocupación/ trabajo
+
+
+```{r}
+sel_clean |> 
+  eda(P114)
+```
+
+* entorno familiar
+
+```{r}
+sel_clean |> 
+  eda(P122)
+```
+
+* Barrio/amigos
+
+```{r}
+sel_clean |> 
+  eda(P135)
+```
+
+```{r}
+sel_clean |> 
+  eda(P136)
+```
+
+
+
+### Tipo de delito 
+
+```{r}
+#output[[8]]
+sel_clean |> 
+  eda(DELITO_GENERICO)
+```
+
+
+```{r}
+#output[[9]]
+```
+
+
+```{r}
+sel_clean |> 
+  eda(P136)
+```
+
+```{r}
+sel_clean |> 
+  eda(P215)
+```
+
+
+```{r}
+sel_clean |> 
+  eda(P216)
+```
+
+
+
+
+
+
+
+
+
