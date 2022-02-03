@@ -1,0 +1,269 @@
+---
+title: "Assignment_2"
+author: "Daniel Soto"
+date: "3/2/2022"
+output: 
+  html_document:
+    collapsed: FALSE
+    theme: cosmo
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+## Antecedentes
+
+### Instalación de paquetes necesarios
+
+```{r library}
+# For importing data an data cleaning
+library(haven)
+library(rio)
+library(tidyverse)
+# For manipulating labels
+library(sjPlot)
+library(sjlabelled)
+```
+
+### Cargando la data
+
+
+```{r joining data}
+pob_pen_raw <- read_sav("https://github.com/DanielSotoHurtado/Censo_Nacional_Penitenciario/raw/main/_data/pob_pen_sel.sav", encoding = "UTF-8")
+```
+
+* Seleccionamos las variables con las que trabajaremos
+
+```{r}
+selected_var <- c('ID_CARATULA', 'DD', 'EST_PENIT', 'GENERO', 'EDAD', 'NACIONALIDAD', 'DELITO_GENERICO',
+                    'DELITO_ESPECIFICO', 'P104_1',
+                    'P119_1', 'P119_2', 'P119_3', 'P119_4', 'P119_5', 'P119_6',
+                    'P109_1','P109_2', 'P126', 'P127', 'P128', 'P129',
+                    'P133', 'P135', 'P136',
+                    'P216'
+                    )
+```
+
+* Creamos la base `pob_pen_sel`
+
+```{r select variables}
+pob_pen_sel <- pob_pen_raw |>
+  select(all_of(selected_var))
+```
+
+### Limpieza de la base de datos
+
+
++ En primer lugar, reemplazamos los valores de la variable con las etiquetas de los mismos para nuestras `selected_var`. Guardamos el resultado en el objeto `sel_clean`
+
+```{r}
+sel_clean <- pob_pen_sel  |> 
+  mutate(across(.cols = selected_var,
+                .fns = ~ as_label(.x)),
+         across(.cols = selected_var,
+                .fns = ~ str_replace_all(.x, "\\?", "" )),
+         across(.cols = where(is.character) & !c(EDAD),
+                .fns = as.factor))
+```
+
++ Ahora, dicotomizamos las variables 
+
+```{r}
+sel_clean <- sel_clean |> 
+  mutate(across(.cols = c(P109_1, P109_2, P127, P128, P129),
+                .fns = ~ str_detect(.x, "Sí"),
+                .names = "si_{.col}")) |> 
+  mutate(si_P126 = 
+           fct_collapse(P126, 
+                        'Sí' = c('Sí, a veces', 'Sí, siempre'),
+                        'No' = c('No','No contesta' )),
+         si_P126 = str_detect(P126, "Sí"))
+```
+
+```{r}
+#haven::write_sav(sel_clean, "sel_clean.sav")
+```
+
+
+```{r}
+#sjPlot::view_df(pob_pen_raw)
+#sjPlot::view_df(sel_clean)
+
+```
+
+
+## Análisis Exploratorio
+
+### Escribiendo una función para las variables seleccionadas
+
+```{r}
+eda <- function(data, group_col){
+  
+  data |> 
+    group_by({{group_col}}) |> 
+    summarize(count = n()) |> 
+    mutate(percent = round((count / sum(count)) * 100, digits = 2)) |> 
+    arrange(desc(count)) |> 
+    drop_na()
+
+}
+
+```
+
+### Análisis descriptivo principales variables
+
+* P109_1. ¿Consumía drogas antes de ingresar al penal?
+
+```{r}
+# Estructura de la variable
+get_label(pob_pen_sel$P109_1)
+sel_clean |> 
+  eda(P109_1)
+```
+
+  * Agrupado por penal: P109_1
+  
+```{r}
+sel_clean |> 
+  filter(EST_PENIT %in% c("E.P. de Lurigancho")) |> 
+  group_by(EST_PENIT) |> 
+  count(P109_1, sort = T) |>
+  mutate(pct = n/sum(n)*100)
+
+```
+  
+  * A nivel nacional: si_P109_1 (**dicotomica**)
+  
+```{r}
+# porcentaje de personas que consumían drogas antes de ingresar al penal
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Lurigancho")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P109_1, sort = T) |>
+  mutate(pct = n/sum(n)*100) |> 
+  filter(si_P109_1 == TRUE) |> 
+  select(-si_P109_1)
+
+
+```
+
+
+* ¿Consumía bebidas alcohólicas antes de ingresar al penal?
+
+
+```{r}
+get_label(pob_pen_sel$P109_2)
+sel_clean |> 
+  eda(P109_2)
+```
+
+  * Porcentaje de personas que **Sí** bebían alcohol antes de ingresar al penal
+
+```{r}
+
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P109_2, sort = T) |>
+  mutate(pct = n/sum(n)*100) |> 
+  filter(si_P109_2 == TRUE) |> 
+  select(-si_P109_2)
+```
+
+* ¿Sus padres o cuidadores le pegaban cuando era niño?
+
+```{r}
+get_label(pob_pen_sel$P126 )
+sel_clean |> 
+  eda(P126)
+
+sel_clean |> 
+  filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P126, sort = T) |>
+  mutate(pct = n/sum(n)*100)
+
+```
+
+
+```{r}
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P126, sort = T) |>
+  mutate(pct = n/sum(n)*100)|> 
+  filter(si_P126 == TRUE) |> 
+  select(-si_P126)
+```
+
+
+* ¿Sus padres o cuidadores tomaban alcohol frecuentemente cuando era niño?
+
+```{r}
+get_label(pob_pen_sel$P127 )
+sel_clean |> 
+  eda(P127)
+```
+
+  * Sus padres o cuidadores **Sí** tomaban alcohol frecuentemente cuando era niño
+
+```{r}
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P127, sort = T) |>
+  mutate(pct = n/sum(n)*100) |> 
+  filter(si_P127 == TRUE) |> 
+  select(-si_P127)
+```
+
+* ¿Sus padres o cuidadores consumían drogas cuando era niño?
+```{r}
+get_label(pob_pen_sel$P128 )
+sel_clean |> 
+  eda(P128)
+```
+
+  * Sus padres o cuidadores **Sí** consumían drogas cuando era niño
+```{r}
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P128, sort = T) |>
+  mutate(pct = n/sum(n)*100) |> 
+  filter(si_P128 == TRUE) |> 
+  select(-si_P128)
+```
+
+
+
+* ¿Su madre sufrió violencia física por parte de su pareja?
+```{r}
+get_label(pob_pen_sel$P129 )
+sel_clean |> 
+  eda(P129)
+```
+
+  * Su madre **Sí** sufrió violencia física por parte de su pareja
+```{r}
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  group_by(EST_PENIT) |> 
+  count(si_P129, sort = T) |>
+  mutate(pct = n/sum(n)*100) |> 
+  filter(si_P129 == TRUE) |> 
+  select(-si_P129)
+```
+
+
+
+
