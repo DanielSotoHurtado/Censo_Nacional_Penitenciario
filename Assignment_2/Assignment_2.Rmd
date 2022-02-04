@@ -17,7 +17,7 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE,
-                      message = FALSE)
+                      messEDAD = FALSE)
 ```
 
 ## Antecedentes
@@ -67,7 +67,7 @@ pob_pen_sel <- pob_pen_raw |>
 
 ```{r}
 sel_clean <- pob_pen_sel  |> 
-  mutate(across(.cols = selected_var,
+  mutate(across(.cols = all_of(selected_var),
                 .fns = ~ as_label(.x)),
          across(.cols = selected_var,
                 .fns = ~ str_replace_all(.x, "\\?", "" )),
@@ -79,7 +79,7 @@ sel_clean <- pob_pen_sel  |>
 
 ```{r}
 sel_clean <- sel_clean |> 
-  mutate(across(.cols = c(P109_1, P109_2, P127, P128, P129),
+  mutate(across(.cols = c(P119_1:P119_6,P109_1, P109_2, P127, P128, P129),
                 .fns = ~ str_detect(.x, "Sí"),
                 .names = "si_{.col}")) |> 
   mutate(si_P126 = 
@@ -87,6 +87,37 @@ sel_clean <- sel_clean |>
                         'Sí' = c('Sí, a veces', 'Sí, siempre'),
                         'No' = c('No','No contesta' )),
          si_P126 = str_detect(P126, "Sí"))
+```
+
++ Recategorizamos `EDAD` y EDUCACIÓN `P104_1`
+
+```{r}
+sel_clean <- sel_clean |> 
+  mutate(grupo_edad = case_when(
+    between(EDAD,60,69) ~ "60-69",
+    between(EDAD,50,59) ~ "50-59",
+    between(EDAD,40,49) ~ "40-49",
+    between(EDAD,30,39) ~ "30-39",
+    between(EDAD,18,29) ~ "18-29",
+    TRUE ~ "70 a más")) |> 
+  mutate(grupo_P104_1 = fct_collapse(
+    P104_1, 
+    Primaria = c('Sin nivel', 'Educación inicial', 'Primaria incompleta', 'Primaria completa'),
+    Secundaria = c('Secundaria incompleta', 'Secundaria completa'),
+    Superior = c('Superior no universitaria incompleta','Superior no universitaria completa', 'Superior universitaria incompleta', 'Superior universitaria completa')
+    
+                               
+  ))
+```
+
++ Creamos variable dicotómica pertenencia a FFAA, PNP, etc.
+
+```{r}
+sel_clean <- sel_clean |> 
+  mutate(si_IIAA = si_P119_1+si_P119_2+si_P119_3+
+           si_P119_4+si_P119_5+si_P119_6) |> 
+  mutate(si_IIAA = if_else(si_IIAA>1, 1, 0))
+   
 ```
 
 ```{r}
@@ -105,7 +136,7 @@ sel_clean <- sel_clean |>
 
 ### Escribiendo una función para las variables seleccionadas
 
-```{r}
+```{r, include=FALSE}
 eda <- function(data, group_col){
   
   data |> 
@@ -119,18 +150,9 @@ eda <- function(data, group_col){
 
 ```
 
-### Análisis descriptivo principales variables
 
-* P109_1. ¿Consumía drogas antes de ingresar al penal?
+### P109_1. ¿Consumía drogas antes de ingresar al penal?
 
-```{r}
-# Estructura de la variable
-get_label(pob_pen_sel$P109_1)
-sel_clean |> 
-  eda(P109_1)
-```
-
-  * Agrupado por penal: P109_1
   
 ```{r}
 sel_clean |> 
@@ -141,7 +163,7 @@ sel_clean |>
 
 ```
   
-  * A nivel nacional: si_P109_1 (**dicotomica**)
+### si_P109_1. Porcentaje de personas que **Sí** consumían droga antes de ingresar al penal
   
 ```{r}
 # porcentaje de personas que consumían drogas antes de ingresar al penal
@@ -157,16 +179,7 @@ sel_clean |>
 ```
 
 
-* ¿Consumía bebidas alcohólicas antes de ingresar al penal?
-
-
-```{r}
-get_label(pob_pen_sel$P109_2)
-sel_clean |> 
-  eda(P109_2)
-```
-
-  * Porcentaje de personas que **Sí** bebían alcohol antes de ingresar al penal
+#### si_P109_2. Porcentaje de personas que **Sí** bebían alcohol antes de ingresar al penal
 
 ```{r}
 
@@ -179,13 +192,9 @@ sel_clean |>
   select(-si_P109_2)
 ```
 
-* ¿Sus padres o cuidadores le pegaban cuando era niño?
+### P126. ¿Sus padres o cuidadores le pegaban cuando era niño?
 
 ```{r}
-get_label(pob_pen_sel$P126 )
-sel_clean |> 
-  eda(P126)
-
 sel_clean |> 
   filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
   group_by(EST_PENIT) |> 
@@ -194,6 +203,7 @@ sel_clean |>
 
 ```
 
+### si_P126. Sus padres o cuidadores **Sí** le pegaban cuando era niño
 
 ```{r}
 sel_clean |> 
@@ -206,15 +216,7 @@ sel_clean |>
 ```
 
 
-* ¿Sus padres o cuidadores tomaban alcohol frecuentemente cuando era niño?
-
-```{r}
-get_label(pob_pen_sel$P127 )
-sel_clean |> 
-  eda(P127)
-```
-
-  * Sus padres o cuidadores **Sí** tomaban alcohol frecuentemente cuando era niño
+### si_P127. Sus padres o cuidadores **Sí** tomaban alcohol cuando era niño
 
 ```{r}
 sel_clean |> 
@@ -226,14 +228,8 @@ sel_clean |>
   select(-si_P127)
 ```
 
-* ¿Sus padres o cuidadores consumían drogas cuando era niño?
-```{r}
-get_label(pob_pen_sel$P128 )
-sel_clean |> 
-  eda(P128)
-```
 
-  * Sus padres o cuidadores **Sí** consumían drogas cuando era niño
+### si_P128. Sus padres o cuidadores **Sí** consumían drogas cuando era niño
 ```{r}
 sel_clean |> 
   #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
@@ -245,23 +241,47 @@ sel_clean |>
 ```
 
 
-
-* ¿Su madre sufrió violencia física por parte de su pareja?
-```{r}
-get_label(pob_pen_sel$P129 )
-sel_clean |> 
-  eda(P129)
-```
-
-  * Su madre **Sí** sufrió violencia física por parte de su pareja
+### si_P129. Su madre **Sí** sufrió violencia física por parte de su pareja
+  
 ```{r}
 sel_clean |> 
-  #filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
+  filter(EST_PENIT %in% c("E.P. de Trujillo")) |> 
   group_by(EST_PENIT) |> 
   count(si_P129, sort = T) |>
   mutate(pct = n/sum(n)*100) |> 
   filter(si_P129 == TRUE) |> 
   select(-si_P129)
+```
+
+### 5 principales delitos por penal
+
+```{r}
+sel_clean |> 
+  filter(EST_PENIT %in% c("E.P. de Trujillo")) |>
+  group_by(EST_PENIT) |> 
+  count(EST_PENIT, DELITO_ESPECIFICO, sort = T) |> 
+  mutate(pct = n/sum(n)*100) |> 
+  top_n(10,n ) |> 
+  ggplot(aes(fct_reorder(DELITO_ESPECIFICO,n), n)) +
+  geom_col() +
+  coord_flip() +
+  theme_classic()
+
+```
+
+
+### Gráfico estado jurídico por grupo de edad
+
+```{r}
+sel_clean |> 
+  #filter(EST_PENIT %in% c("E.P. de Lurigancho")) |> 
+  group_by(grupo_edad) |> 
+  count(grupo_edad, P216) |> 
+  mutate(pct = n/sum(n)*100) |> 
+  ggplot(aes(grupo_edad, pct, fill= P216)) +
+  geom_col(position = "fill") +
+  coord_flip()
+  #theme(legend.position = "none")
 ```
 
 
